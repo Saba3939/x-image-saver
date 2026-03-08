@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>X Image Catcher</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-left">
+      <span class="header-icon">📷</span>
+      <h1 class="header-title">X Image Catcher</h1>
+    </div>
+    <button id="btn-clear-all" class="btn-clear-all" title="すべて削除">全削除</button>
+  </header>
+
+  <div class="subheader">
+    <span id="count-label" class="count-label">読み込み中...</span>
+    <input id="search-input" class="search-input" type="search" placeholder="@handle で絞り込み..." autocomplete="off" />
+  </div>
+
+  <main id="gallery" class="gallery">
+    <div id="empty-msg" class="empty-msg" hidden>
+      <div class="empty-icon">🖼️</div>
+      <p class="empty-title">まだ画像がありません</p>
+      <p class="empty-desc">
+        <a href="https://x.com" target="_blank" class="empty-link">x.com</a> を開いてタイムラインをスクロールすると、<br>
+        画像が自動でここに保存されます。
+      </p>
+      <ol class="empty-steps">
+        <li>拡張機能をインストール ✅</li>
+        <li>x.com を開く</li>
+        <li>タイムラインをスクロール</li>
+        <li>ここに画像が自動保存される ✨</li>
+      </ol>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <button id="btn-share" class="btn-share" title="この拡張機能をXでシェア">
+      𝕏 シェアする
+    </button>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

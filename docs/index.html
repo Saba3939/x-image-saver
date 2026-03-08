@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>X Image Catcher — Xのタイムライン画像を自動保存する Chrome 拡張機能</title>
+  <meta name="description" content="Xのタイムラインに流れた画像を自動保存。スクロールするだけでギャラリーに蓄積。見逃した画像をあとから一覧・検索できます。" />
+  <meta property="og:title" content="X Image Catcher" />
+  <meta property="og:description" content="Xのタイムラインに流れた画像を自動保存。スクロールするだけで画像がギャラリーに蓄積されます。" />
+  <meta property="og:type" content="website" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #000;
+      --bg2: #0d0d0d;
+      --bg3: #16181c;
+      --border: #2f3336;
+      --text: #e7e9ea;
+      --muted: #71767b;
+      --accent: #1d9bf0;
+      --accent-hover: #1a8cd8;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ---- Nav ---- */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 56px;
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text);
+    }
+
+    .nav-cta {
+      padding: 8px 20px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 9999px;
+      font-weight: 700;
+      font-size: 14px;
+      transition: background 0.15s;
+    }
+    .nav-cta:hover { background: var(--accent-hover); text-decoration: none; }
+
+    /* ---- Hero ---- */
+    .hero {
+      text-align: center;
+      padding: 80px 24px 60px;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    .hero-badge {
+      display: inline-block;
+      background: rgba(29,155,240,0.15);
+      color: var(--accent);
+      border: 1px solid rgba(29,155,240,0.3);
+      border-radius: 9999px;
+      padding: 4px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .hero h1 {
+      font-size: clamp(32px, 6vw, 52px);
+      font-weight: 900;
+      line-height: 1.15;
+      margin-bottom: 20px;
+      letter-spacing: -0.02em;
+    }
+
+    .hero h1 span {
+      color: var(--accent);
+    }
+
+    .hero p {
+      font-size: 18px;
+      color: var(--muted);
+      margin-bottom: 36px;
+      line-height: 1.7;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 9999px;
+      font-weight: 700;
+      font-size: 16px;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-primary:hover { background: var(--accent-hover); text-decoration: none; transform: translateY(-1px); }
+
+    .btn-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 28px;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 9999px;
+      font-weight: 600;
+      font-size: 16px;
+      transition: background 0.15s;
+    }
+    .btn-secondary:hover { background: var(--bg3); text-decoration: none; }
+
+    /* ---- Mock popup ---- */
+    .mock-wrap {
+      display: flex;
+      justify-content: center;
+      padding: 40px 24px 60px;
+    }
+
+    .mock-popup {
+      width: 300px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(29,155,240,0.12), 0 8px 24px rgba(0,0,0,0.6);
+    }
+
+    .mock-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mock-header-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .mock-badge-count {
+      padding: 3px 8px;
+      background: rgba(244,33,46,0.15);
+      color: #f4212e;
+      border: 1px solid rgba(244,33,46,0.3);
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .mock-count {
+      padding: 6px 14px;
+      font-size: 12px;
+      color: var(--muted);
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .mock-gallery {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+      padding: 4px;
+      background: var(--bg);
+    }
+
+    .mock-thumb {
+      aspect-ratio: 1;
+      border-radius: 6px;
+      background: var(--bg3);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .mock-thumb-inner {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(135deg, #1e2124 0%, #2f3336 100%);
+    }
+
+    .mock-thumb:nth-child(1) .mock-thumb-inner { background: linear-gradient(135deg, #1a3a4a, #1d9bf0 80%); opacity: 0.7; }
+    .mock-thumb:nth-child(2) .mock-thumb-inner { background: linear-gradient(135deg, #3a1a2a, #f4212e 80%); opacity: 0.7; }
+    .mock-thumb:nth-child(3) .mock-thumb-inner { background: linear-gradient(135deg, #1a3a2a, #00ba7c 80%); opacity: 0.7; }
+    .mock-thumb:nth-child(4) .mock-thumb-inner { background: linear-gradient(135deg, #2a2a3a, #794bc4 80%); opacity: 0.7; }
+
+    .mock-footer {
+      padding: 8px;
+      background: var(--bg3);
+      border-top: 1px solid var(--border);
+      text-align: center;
+    }
+
+    .mock-share-btn {
+      display: inline-block;
+      padding: 6px 16px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    /* ---- Features ---- */
+    .features {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: 28px;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+
+    .section-sub {
+      text-align: center;
+      color: var(--muted);
+      margin-bottom: 48px;
+      font-size: 16px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+
+    .feature-card {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      transition: border-color 0.15s;
+    }
+    .feature-card:hover { border-color: var(--accent); }
+
+    .feature-icon {
+      font-size: 32px;
+      margin-bottom: 14px;
+    }
+
+    .feature-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .feature-desc {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    /* ---- How to ---- */
+    .howto {
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      padding: 80px 24px;
+    }
+
+    .howto-inner {
+      max-width: 640px;
+      margin: 0 auto;
+    }
+
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin-top: 48px;
+    }
+
+    .step {
+      display: flex;
+      gap: 20px;
+      align-items: flex-start;
+      position: relative;
+      padding-bottom: 32px;
+    }
+
+    .step:last-child { padding-bottom: 0; }
+
+    .step:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      left: 19px;
+      top: 40px;
+      width: 2px;
+      height: calc(100% - 40px);
+      background: var(--border);
+    }
+
+    .step-num {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 800;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      z-index: 1;
+    }
+
+    .step-content h3 {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 4px;
+      padding-top: 8px;
+    }
+
+    .step-content p {
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    /* ---- Privacy ---- */
+    .privacy {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 80px 24px;
+      text-align: center;
+    }
+
+    .privacy-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .privacy h2 {
+      font-size: 24px;
+      font-weight: 800;
+      margin-bottom: 12px;
+    }
+
+    .privacy p {
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .privacy-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-top: 20px;
+    }
+
+    .privacy-tag {
+      padding: 6px 14px;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 9999px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    /* ---- CTA bottom ---- */
+    .cta-bottom {
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      text-align: center;
+      padding: 80px 24px;
+    }
+
+    .cta-bottom h2 {
+      font-size: 32px;
+      font-weight: 900;
+      margin-bottom: 16px;
+    }
+
+    .cta-bottom p {
+      color: var(--muted);
+      font-size: 16px;
+      margin-bottom: 32px;
+    }
+
+    /* ---- Footer ---- */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Nav -->
+  <nav>
+    <div class="nav-brand">
+      <span>📷</span>
+      X Image Catcher
+    </div>
+    <a href="https://chrome.google.com/webstore" class="nav-cta" target="_blank" rel="noopener">
+      Chrome に追加（無料）
+    </a>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-badge">✨ 完全無料 · データ収集なし · 広告なし</div>
+    <h1>Xの画像を<br><span>流し見しながら</span><br>自動保存</h1>
+    <p>
+      タイムラインをスクロールするだけで、<br>
+      気になった画像がギャラリーに自動で蓄積されます。<br>
+      後からゆっくり見返して、いいね・ブックマークができます。
+    </p>
+    <div class="hero-actions">
+      <a href="https://chrome.google.com/webstore" class="btn-primary" target="_blank" rel="noopener">
+        🚀 Chrome に追加する
+      </a>
+      <a href="#howto" class="btn-secondary">
+        使い方を見る
+      </a>
+    </div>
+  </section>
+
+  <!-- Mock popup -->
+  <div class="mock-wrap">
+    <div class="mock-popup">
+      <div class="mock-header">
+        <div class="mock-header-left">📷 X Image Catcher</div>
+        <span class="mock-badge-count">全削除</span>
+      </div>
+      <div class="mock-count">42件保存済み</div>
+      <div class="mock-gallery">
+        <div class="mock-thumb"><div class="mock-thumb-inner"></div></div>
+        <div class="mock-thumb"><div class="mock-thumb-inner"></div></div>
+        <div class="mock-thumb"><div class="mock-thumb-inner"></div></div>
+        <div class="mock-thumb"><div class="mock-thumb-inner"></div></div>
+      </div>
+      <div class="mock-footer">
+        <span class="mock-share-btn">𝕏 シェアする</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Features -->
+  <section class="features">
+    <h2 class="section-title">なぜ X Image Catcher？</h2>
+    <p class="section-sub">Xのタイムラインは流れが速い。気になった画像を後から探すのは大変です。</p>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <div class="feature-title">スクロールするだけ</div>
+        <div class="feature-desc">特別な操作は一切不要。x.com を普通に使っているだけで、自動的に画像がキャプチャされます。</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔒</div>
+        <div class="feature-title">完全ローカル保存</div>
+        <div class="feature-desc">データは外部サーバーには送信されず、あなたのブラウザのみに保存されます。プライバシーは完全に守られます。</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🔍</div>
+        <div class="feature-title">@handle で絞り込み</div>
+        <div class="feature-desc">「あのアカウントの画像だけ見たい」という時に、投稿者のハンドル名で瞬時に絞り込めます。</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">📌</div>
+        <div class="feature-title">最大1,000件保存</div>
+        <div class="feature-desc">最新1,000件まで自動で蓄積。古いものから順に削除されるので、ストレージを圧迫しません。</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🚫</div>
+        <div class="feature-title">広告は自動スキップ</div>
+        <div class="feature-desc">プロモーション投稿（広告）の画像は自動的に除外されます。純粋なタイムラインの画像だけが保存されます。</div>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">⌨️</div>
+        <div class="feature-title">キーボードショートカット</div>
+        <div class="feature-desc">Alt+X を押すだけでポップアップが開きます。マウスを動かさずにギャラリーにアクセスできます。</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How to -->
+  <section class="howto" id="howto">
+    <div class="howto-inner">
+      <h2 class="section-title">使い方は超シンプル</h2>
+      <p class="section-sub">たった3ステップで始められます</p>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <h3>Chrome に拡張機能を追加する</h3>
+            <p>「Chrome に追加」ボタンをクリックして、拡張機能をインストールします。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <h3>x.com を開いてスクロールする</h3>
+            <p>普段通りタイムラインを眺めるだけ。画像が表示されると自動的にキャプチャされます。</p>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <h3>アイコンをクリックしてギャラリーを開く</h3>
+            <p>ブラウザ右上の拡張機能アイコン（または Alt+X）でポップアップを開き、保存した画像を一覧できます。</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Privacy -->
+  <section class="privacy">
+    <div class="privacy-icon">🔐</div>
+    <h2>プライバシーを最優先に設計</h2>
+    <p>
+      X Image Catcher はあなたのデータを一切外部に送信しません。
+      画像URLとツイートのメタデータはすべてあなたのブラウザ内にのみ保存されます。
+    </p>
+    <div class="privacy-tags">
+      <span class="privacy-tag">✅ 外部サーバーへの送信なし</span>
+      <span class="privacy-tag">✅ トラッキングなし</span>
+      <span class="privacy-tag">✅ 広告なし</span>
+      <span class="privacy-tag">✅ 完全無料</span>
+      <span class="privacy-tag">✅ オープンソース</span>
+    </div>
+  </section>
+
+  <!-- CTA bottom -->
+  <section class="cta-bottom">
+    <h2>今すぐ始めよう 📷</h2>
+    <p>インストールは無料。Xのタイムラインをもっと活用しよう。</p>
+    <a href="https://chrome.google.com/webstore" class="btn-primary" target="_blank" rel="noopener">
+      🚀 Chrome に追加する（無料）
+    </a>
+  </section>
+
+  <!-- Footer -->
+  <footer>
+    <p>X Image Catcher — Made with ❤️ &nbsp;|&nbsp; データは収集しません &nbsp;|&nbsp; X/Twitter の非公式ツール</p>
+  </footer>
+
+</body>
+</html>

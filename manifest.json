@@ -1,0 +1,39 @@
+{
+  "manifest_version": 3,
+  "name": "X Image Catcher",
+  "version": "1.1.0",
+  "description": "Xのタイムラインに流れた画像を自動保存。スクロールするだけでギャラリーに蓄積。見逃した画像をあとから一覧・検索できます。",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.x.com/*", "*://*.twitter.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": ["storage"],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+X",
+        "mac": "Alt+X"
+      },
+      "description": "X Image Catcher を開く"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
